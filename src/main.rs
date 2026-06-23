@@ -2,6 +2,7 @@ use bevy::{prelude::*, window::WindowResolution};
 
 
 mod gamestate;
+mod systems;
 fn main() {
    App::new()
         
@@ -17,6 +18,11 @@ fn main() {
     )
     .init_state::<gamestate::GameState>()
     .add_systems(Startup, setup)
+    .add_systems(OnEnter(gamestate::GameState::Intro),systems::intro::setup_intro_music)
+    .add_systems(OnEnter(gamestate::GameState::Intro), systems::intro::setup_game)
+    .add_systems(Update, systems::intro::blink_text.run_if(in_state(gamestate::GameState::Intro)))
+    
+    
     .run();
 }
 
