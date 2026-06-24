@@ -76,3 +76,31 @@ pub fn setup_intro_music(
         IntroEntity,
     ));
 }
+pub fn cleanup_screen(
+    mut commands: Commands,
+    query: Query<Entity, With<IntroEntity>>,
+) {
+    for e in &query {
+        commands.entity(e).despawn();
+    }
+}
+pub fn cleanup_music(
+    mut commands: Commands,
+    query: Query<Entity, With<IntroEntity>>,
+) {
+    for entity in &query {
+        commands.entity(entity).despawn();
+    }
+}
+pub fn press_any_key(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<gamestate::GameState>>,
+) {
+    if keyboard.any_just_pressed([
+        KeyCode::Space,
+        KeyCode::Enter,
+        KeyCode::KeyA,
+    ]) {
+        next_state.set(gamestate::GameState::Playing);
+    }
+}

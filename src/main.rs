@@ -20,6 +20,10 @@ fn main() {
     .add_systems(Startup, setup)
     .add_systems(OnEnter(gamestate::GameState::Intro),systems::intro::setup_intro_music)
     .add_systems(OnEnter(gamestate::GameState::Intro), systems::intro::setup_game)
+    .add_systems(Update, systems::intro::press_any_key.run_if(in_state(gamestate::GameState::Intro)))
+    
+    .add_systems(OnExit(gamestate::GameState::Intro), systems::intro::cleanup_screen)
+    .add_systems(OnExit(gamestate::GameState::Intro), systems::intro::cleanup_music)
     .add_systems(Update, systems::intro::blink_text.run_if(in_state(gamestate::GameState::Intro)))
     
     
