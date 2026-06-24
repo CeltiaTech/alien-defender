@@ -29,6 +29,8 @@ fn main() {
     
     .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_walls)
     .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_player)
+    .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_shields)
+    .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_background)
     .insert_resource(systems::play::AlienFleet::default())
     .init_resource::<systems::play::AlienShootTimer>()
     .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_aliens)
@@ -38,6 +40,8 @@ fn main() {
     .add_systems(Update, systems::play::weapon_cooldown_system.run_if(in_state(gamestate::GameState::Playing)))
     .add_systems(Update, (systems::play::move_aliens,systems::play::animate_aliens).chain().run_if(in_state(gamestate::GameState::Playing)))
     .add_systems(Update, (systems::play::alien_shoot_system,systems::play::projectile_player_collision_system).run_if(in_state(gamestate::GameState::Playing)))
+    .add_systems(Update,(systems::play::projectile_shield_collision_system).run_if(in_state(gamestate::GameState::Playing)),
+)
     .run();
 }
 
