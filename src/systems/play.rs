@@ -65,7 +65,8 @@ impl Default for AlienShootTimer {
         }
     }
 }
-
+#[derive(Component)]
+pub struct ShieldBlock;
 pub fn alien_shoot_system(
     mut commands: Commands,
     time: Res<Time>,
@@ -115,6 +116,18 @@ pub fn alien_shoot_system(
         origin,
         Vec2::new(0.0, -300.0),
     );
+}
+pub fn spawn_background(mut commands: Commands,asset_server:  Res<AssetServer>){
+    let texture = asset_server.load("backgrounds/level1.png");
+
+
+    // Créer un sprite avec cette image
+    commands.spawn((
+        Sprite::from_image(texture),
+        Transform::from_xyz(0.0, 0.0, -10.0),
+        GameEntity,
+        
+    ));
 }
 pub fn spawn_walls(mut commands: Commands){
     let wall_thickness = 16.0;
@@ -466,6 +479,63 @@ pub fn projectile_player_collision_system(
             println!("GAME OVER");
 
             break;
+        }
+    }
+}
+pub fn spawn_shields(mut commands: Commands) {
+    let shield_positions = [-360.0, 0.0, 360.0];
+
+    let block_size = Vec2::new(14.0, 14.0);
+    let rows = 4;
+    let cols = 8;
+
+    for shield_x in shield_positions {
+        for row in 0..rows {
+            for col in 0..cols {
+                // petit trou central en bas, style abri
+                if row == 0 && (col == 3 || col == 4) {
+                    continue;
+                }
+
+                let x = shield_x + (col as f32 - cols as f32 / 2.0) * block_size.x;
+                let y = -210.0 + row as f32 * block_size.y;
+
+                commands.spawn((
+                    GameEntity,
+                    ShieldBlock,
+                    Sprite::from_color(
+                        Color::srgb(0.2, 1.0, 0.2),
+                        block_size,
+                    ),
+                    Transform::from_xyz(x, y, 2.0),
+                ));
+            }
+        }
+    }
+}
+pub fn projectile_shield_collision_system(
+    mut commands: Commands,
+    projectile_query: Query<(Entity, &Transform), With<Projectile>>,
+    shield_query: Query<(Entity, &Transform), With<ShieldBlock>>,
+) {
+    let projectile_size = Vec2::new(6.0, 12.0);
+    let block_size = Vec2::new(14.0, 14.0);
+
+    for (projectile_entity, projectile_transform) in &projectile_query {
+        let projectile_pos = projectile_transform.translation.truncate();
+
+        for (block_entity, block_transform) in &shield_query {
+            let block_pos = block_transform.translation.truncate();
+
+            let collision =
+                (projectile_pos.x - block_pos.x).abs() < (projectile_size.x + block_size.x) * 0.5
+                && (projectile_pos.y - block_pos.y).abs() < (projectile_size.y + block_size.y) * 0.5;
+
+            if collision {
+                commands.entity(projectile_entity).despawn();
+                commands.entity(block_entity).despawn();
+                break;
+            }
         }
     }
 }
