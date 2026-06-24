@@ -30,6 +30,9 @@ fn main() {
     .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_walls)
     .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_player)
     .add_systems(Update, systems::play::player_movement_system.run_if(in_state(gamestate::GameState::Playing)))
+    .add_systems(Update, systems::play::player_shoot_system)
+    .add_systems(Update, systems::play::projectile_movement_system)
+    .add_systems(Update, systems::play::weapon_cooldown_system)
     .run();
 }
 
