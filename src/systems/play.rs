@@ -13,10 +13,40 @@ pub struct PlayerWeapon {
     pub timer: Timer,
 }
 #[derive(Component)]
+
+pub struct Alien;
+#[derive(Component)]
+
+pub struct AlienAnimation {
+    pub timer: Timer,
+}
+#[derive(Component)]
 pub struct GameEntity;
 #[derive(Component)]
 pub struct Projectile {
     pub velocity: Vec2
+}
+#[derive(Resource)]
+
+pub struct AlienFleet {
+    pub direction: f32,
+    pub base_speed: f32,
+    pub max_speed: f32,
+    pub step_down: f32,
+    pub initial_count: usize,
+}
+
+impl Default for AlienFleet {
+    fn default() -> Self {
+        Self {
+            direction: 1.0,
+            base_speed: 40.0,
+            max_speed: 180.0,
+            step_down: 24.0,
+            initial_count: 55,
+        }
+    }
+
 }
 pub fn spawn_walls(mut commands: Commands){
     let wall_thickness = 16.0;
@@ -73,6 +103,55 @@ pub fn spawn_player(mut commands: Commands,asset_server:  Res<AssetServer>) {
         Transform::from_xyz(0.0, -320.0+WALL_THICKNESS, 10.0),
         GlobalTransform::default(),
     ));
+}
+pub fn spawn_aliens(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+
+    let texture = asset_server.load("sprites/alien_walk.png");
+    let layout = TextureAtlasLayout::from_grid(
+        UVec2::new(276, 266),
+        4,
+        1,
+        Some(UVec2::new(41, 0)),
+        None,
+    );
+    let layout_handle = texture_atlas_layouts.add(layout);
+    let columns = 11;
+    let rows = 5;
+    let sprite_size = Vec2::new(48.0, 48.0);
+    let spacing = Vec2::new(32.0, 24.0);
+    let start_x = -((columns as f32 - 1.0) * (sprite_size.x + spacing.x)) / 2.0;
+    let start_y = 300.0;
+    for row in 0..rows {
+        for col in 0..columns {
+            let x = start_x + col as f32 * (sprite_size.x + spacing.x);
+            let y = start_y - row as f32 * (sprite_size.y + spacing.y);
+            commands.spawn((
+                Alien,
+                AlienAnimation {
+                    timer: Timer::from_seconds(0.25, TimerMode::Repeating),
+                },
+                Sprite {
+                    image: texture.clone(),
+                    texture_atlas: Some(TextureAtlas {
+                        layout: layout_handle.clone(),
+                        index: 0,
+                    }),
+                    custom_size: Some(sprite_size),
+                    ..default()
+                },
+                Transform::from_xyz(x, y, 0.0),
+            ));
+
+            
+
+        }
+
+    }
+
 }
 pub fn player_movement_system(
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -177,5 +256,77 @@ pub fn weapon_cooldown_system(
 ) {
     for mut weapon in &mut query {
         weapon.timer.tick(time.delta());
+    }
+}
+pub fn move_aliens(
+    time: Res<Time>,
+    mut fleet: ResMut<AlienFleet>,
+    mut alien_query: Query<&mut Transform, With<Alien>>,
+    window_query: Query<&Window>,
+) {
+    let Ok(window) = window_query.single() else {
+        return;
+    };
+
+    let alien_count = alien_query.iter().count();
+
+    if alien_count == 0 {
+        return;
+    }
+
+    let remaining_ratio = alien_count as f32 / fleet.initial_count as f32;
+
+    let speed = fleet.base_speed
+        + (1.0 - remaining_ratio) * (fleet.max_speed - fleet.base_speed);
+
+    let half_width = window.width() / 2.0;
+    let margin = 40.0;
+
+    let left_limit = -half_width + margin;
+    let right_limit = half_width - margin;
+
+    let mut should_turn = false;
+
+    for transform in alien_query.iter() {
+        let x = transform.translation.x;
+
+        if fleet.direction > 0.0 && x >= right_limit {
+            should_turn = true;
+            break;
+        }
+
+        if fleet.direction < 0.0 && x <= left_limit {
+            should_turn = true;
+            break;
+        }
+    }
+
+    if should_turn {
+        fleet.direction *= -1.0;
+
+        for mut transform in alien_query.iter_mut() {
+            transform.translation.y -= fleet.step_down;
+        }
+    } else {
+        let dx = fleet.direction * speed * time.delta_secs();
+
+        for mut transform in alien_query.iter_mut() {
+            transform.translation.x += dx;
+        }
+    }
+}
+
+pub fn animate_aliens(
+    time: Res<Time>,
+    mut query: Query<(&mut AlienAnimation, &mut Sprite), With<Alien>>,
+) {
+    for (mut animation, mut sprite) in &mut query {
+        animation.timer.tick(time.delta());
+
+        if animation.timer.just_finished() {
+            if let Some(atlas) = &mut sprite.texture_atlas {
+                atlas.index = (atlas.index + 1) % 4;
+            }
+        }
     }
 }
