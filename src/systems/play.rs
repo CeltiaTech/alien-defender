@@ -1,4 +1,7 @@
 use bevy::prelude::*;
+use rand::rng;
+
+use rand::RngExt;
 // Épaisseur des murs
 const WALL_THICKNESS: f32 = 16.0;
 #[derive(Component)]
@@ -41,12 +44,77 @@ impl Default for AlienFleet {
         Self {
             direction: 1.0,
             base_speed: 40.0,
-            max_speed: 180.0,
-            step_down: 24.0,
+            max_speed: 300.0,
+            step_down: 12.0,
             initial_count: 55,
         }
     }
 
+}
+
+
+#[derive(Resource)]
+pub struct AlienShootTimer {
+    pub timer: Timer,
+}
+
+impl Default for AlienShootTimer {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+        }
+    }
+}
+
+pub fn alien_shoot_system(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut shoot_timer: ResMut<AlienShootTimer>,
+    alien_query: Query<&Transform, With<Alien>>,
+) {
+    shoot_timer.timer.tick(time.delta());
+
+    if !shoot_timer.timer.just_finished() {
+        return;
+    }
+
+    let aliens: Vec<&Transform> = alien_query.iter().collect();
+
+    if aliens.is_empty() {
+        return;
+    }
+
+    let mut rng = rng();
+
+    let index = rng.random_range(0..aliens.len());
+
+    let random_alien = aliens[index];
+    let column_x = random_alien.translation.x;
+
+    let column_tolerance = 8.0;
+
+    let Some(shooter) = aliens
+        .iter()
+        .filter(|alien| {
+            (alien.translation.x - column_x).abs() < column_tolerance
+        })
+        .min_by(|a, b| {
+            a.translation
+                .y
+                .partial_cmp(&b.translation.y)
+                .unwrap()
+        })
+    else {
+        return;
+    };
+
+    let origin = shooter.translation.truncate() + Vec2::new(0.0, -28.0);
+
+    spawn_projectile(
+        &mut commands,
+        origin,
+        Vec2::new(0.0, -300.0),
+    );
 }
 pub fn spawn_walls(mut commands: Commands){
     let wall_thickness = 16.0;
@@ -327,6 +395,77 @@ pub fn animate_aliens(
             if let Some(atlas) = &mut sprite.texture_atlas {
                 atlas.index = (atlas.index + 1) % 4;
             }
+        }
+    }
+}pub fn projectile_alien_collision_system(
+    mut commands: Commands,
+    projectile_query: Query<(Entity, &Transform), With<Projectile>>,
+    alien_query: Query<(Entity, &Transform), With<Alien>>,
+) {
+    let projectile_size = Vec2::new(6.0, 6.0);
+    let alien_size = Vec2::new(48.0, 48.0);
+
+    for (projectile_entity, projectile_transform) in &projectile_query {
+        let projectile_pos = projectile_transform.translation.truncate();
+
+        let mut hit = false;
+
+        for (alien_entity, alien_transform) in &alien_query {
+            let alien_pos = alien_transform.translation.truncate();
+
+            let collision =
+                (projectile_pos.x - alien_pos.x).abs()
+                    < (projectile_size.x + alien_size.x) * 0.5
+                && (projectile_pos.y - alien_pos.y).abs()
+                    < (projectile_size.y + alien_size.y) * 0.5;
+
+            if collision {
+                commands.entity(projectile_entity).despawn();
+                commands.entity(alien_entity).despawn();
+
+                hit = true;
+                break;
+            }
+        }
+
+        if hit {
+            continue;
+        }
+    }
+}
+pub fn projectile_player_collision_system(
+    mut commands: Commands,
+    projectile_query: Query<(Entity, &Transform, &Projectile)>,
+    player_query: Query<(Entity, &Transform), With<Player>>,
+) {
+    let projectile_size = Vec2::new(6.0, 12.0);
+    let player_size = Vec2::new(48.0, 48.0);
+
+    let Ok((player_entity, player_transform)) = player_query.single() else {
+        return;
+    };
+
+    let player_pos = player_transform.translation.truncate();
+
+    for (projectile_entity, projectile_transform, projectile) in &projectile_query {
+        // seuls les projectiles qui descendent peuvent toucher le joueur
+        if projectile.velocity.y >= 0.0 {
+            continue;
+        }
+
+        let projectile_pos = projectile_transform.translation.truncate();
+
+        let collision =
+            (projectile_pos.x - player_pos.x).abs() < (projectile_size.x + player_size.x) * 0.5
+            && (projectile_pos.y - player_pos.y).abs() < (projectile_size.y + player_size.y) * 0.5;
+
+        if collision {
+            commands.entity(projectile_entity).despawn();
+            commands.entity(player_entity).despawn();
+
+            println!("GAME OVER");
+
+            break;
         }
     }
 }
