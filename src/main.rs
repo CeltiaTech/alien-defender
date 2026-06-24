@@ -25,8 +25,11 @@ fn main() {
     .add_systems(OnExit(gamestate::GameState::Intro), systems::intro::cleanup_screen)
     .add_systems(OnExit(gamestate::GameState::Intro), systems::intro::cleanup_music)
     .add_systems(Update, systems::intro::blink_text.run_if(in_state(gamestate::GameState::Intro)))
+    //Playing State
     
-    
+    .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_walls)
+    .add_systems(OnEnter(gamestate::GameState::Playing), systems::play::spawn_player)
+    .add_systems(Update, systems::play::player_movement_system.run_if(in_state(gamestate::GameState::Playing)))
     .run();
 }
 
